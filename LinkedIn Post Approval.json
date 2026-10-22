@@ -1,0 +1,450 @@
+{
+  "name": "LinkedIn Post Approval",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "LinkedIn Post Generator",
+        "formDescription": "Enter a topic to generate a draft for review.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Topic"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f722ac6c-e8c0-4070-82c2-feadb64f10d4",
+      "name": "On form submission",
+      "webhookId": "5f2202a6-5cb7-4725-b8ca-b5f69f8ebe77"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Write a LinkedIn post about: {{ $json.Topic }}\nHook in line one, 120-150 words, one call to action, max 3 hashtags. Return the post only.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "f33a5aa4-38e5-42d4-b332-4944e528a11e",
+      "name": "Writer Agent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Score the post below out of 10 on hook, clarity and CTA, then rewrite its weakest part. Return the final post only.\n{{ $json.output }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        528,
+        0
+      ],
+      "id": "20e7aac1-f4ea-4605-8035-ab58cb045370",
+      "name": "Reviewer Agent"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "vviyas@gmail.com",
+        "subject": "Approval Needed: LinkedIn Post",
+        "message": "={{ $json.output }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "resumeUnit": "days"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        0
+      ],
+      "id": "d9ffebcf-af1e-4b52-a538-a1dc4e0517ce",
+      "name": "Send message and wait for response",
+      "webhookId": "92d16ae2-1212-4120-a168-ec8d4e4d4c58",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "A1l5mJu3ExwY3eFR",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bf4bb767-466f-4ef6-b1e9-5cbf8ad2bea6",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1072,
+        0
+      ],
+      "id": "2f8b52a8-a908-4fba-a09b-921fb133c7d3",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/144i8kHSb3n7WJfdgpDgrd2yGQvDIw0iuasXvF6xETKA/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Topic Sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/144i8kHSb3n7WJfdgpDgrd2yGQvDIw0iuasXvF6xETKA/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.data.respondedAt }}",
+            "Final Post": "={{ $('Reviewer Agent').item.json.output }}",
+            "Topic": "={{ $('On form submission').item.json.Topic }}",
+            "Status": "={{ $('Send message and wait for response').item.json.data.approved ? 'Approved' : 'Declined' }}"
+          },
+          "matchingColumns": [
+            "Topic"
+          ],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Topic",
+              "displayName": "Topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Final Post",
+              "displayName": "Final Post",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1296,
+        -96
+      ],
+      "id": "b94bea9d-09c0-489f-8a0b-6a913bbf5e08",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wPPBMxCBH7q4zBsi",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/144i8kHSb3n7WJfdgpDgrd2yGQvDIw0iuasXvF6xETKA/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Topic Sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/144i8kHSb3n7WJfdgpDgrd2yGQvDIw0iuasXvF6xETKA/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Declined",
+            "Date": "={{ $('Send message and wait for response').item.json.data.respondedAt }}",
+            "Topic": "={{ $('On form submission').item.json.Topic }}",
+            "Final Post": "={{ $('Reviewer Agent').item.json.output }}"
+          },
+          "matchingColumns": [
+            "Topic"
+          ],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Topic",
+              "displayName": "Topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Final Post",
+              "displayName": "Final Post",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1296,
+        96
+      ],
+      "id": "02227fae-f957-4f15-9ae2-215d81b9aa04",
+      "name": "Append or update row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wPPBMxCBH7q4zBsi",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        480,
+        176
+      ],
+      "id": "d6bf50f6-7e82-45fe-9513-4beaeb44092f",
+      "name": "Reviewing the Post",
+      "credentials": {
+        "openAiApi": {
+          "id": "cdPuEMx6OudG68J6",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        160,
+        160
+      ],
+      "id": "76638541-a724-444b-a5d6-892232b0a305",
+      "name": "Drafting the Post",
+      "credentials": {
+        "openAiApi": {
+          "id": "cdPuEMx6OudG68J6",
+          "name": "OpenAI account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Writer Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Writer Agent": {
+      "main": [
+        [
+          {
+            "node": "Reviewer Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reviewer Agent": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message and wait for response": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append or update row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reviewing the Post": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Reviewer Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drafting the Post": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Writer Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "169338a3-ef71-4c4e-ba70-9112dd776323",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "81e4f43ceb128f0a5063cf3a14a3a6ed5103dce1df332453ebd90791d974ada4"
+  },
+  "nodeGroups": [],
+  "id": "zEbvzxVZxSBgpzO4",
+  "tags": []
+}
